@@ -1,0 +1,63 @@
+create queue verylong
+set queue verylong queue_type = Execution
+set queue verylong Priority = 40
+set queue verylong max_running = 10
+set queue verylong resources_max.cput = 72:00:00
+set queue verylong resources_min.cput = 12:00:01
+set queue verylong resources_default.cput = 72:00:00
+set queue verylong resources_max.walltime = 72:00:00
+set queue verylong enabled = True
+set queue verylong started = True
+create queue long
+set queue long queue_type = Execution
+set queue long Priority = 60
+set queue long max_running = 10
+set queue long resources_max.cput = 12:00:00
+set queue long resources_min.cput = 02:00:01
+set queue long resources_default.cput = 12:00:00
+set queue long resources_max.walltime = 12:00:00
+set queue long enabled = True
+set queue long started = True
+create queue medium
+set queue medium queue_type = Execution
+set queue medium Priority = 80
+set queue medium max_running = 10
+set queue medium resources_max.cput = 02:00:00
+set queue medium resources_min.cput = 00:20:01
+set queue medium resources_default.cput = 02:00:00
+set queue medium resources_max.walltime = 02:00:00
+set queue medium enabled = True
+set queue medium started = True
+create queue small
+set queue small queue_type = Execution
+set queue small Priority = 100
+set queue small max_running = 10
+set queue small resources_max.cput = 00:20:00
+set queue small resources_default.cput = 00:20:00
+set queue small resources_max.walltime = 00:20:00
+set queue small enabled = True
+set queue small started = True
+create queue default
+set queue default queue_type = Route
+set queue default max_running = 10
+set queue default route_destinations = small
+set queue default route_destinations += medium
+set queue default route_destinations += long
+set queue default route_destinations += verylong
+set queue default enabled = True
+set queue default started = True
+
+set server scheduling = True
+set server max_user_run = 20
+set server acl_host_enable = False
+set server acl_hosts = *.DOMAINNAME
+set server default_queue = default
+set server log_events = 63
+set server mail_from = root 
+set server query_other_jobs = True
+set server resources_default.cput = 01:00:00
+set server resources_default.neednodes = 1
+set server resources_default.nodect = 1
+set server resources_default.nodes = 1
+set server scheduler_iteration = 60
+set server default_node = 1

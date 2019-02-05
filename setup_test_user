@@ -1,0 +1,140 @@
+#!/bin/sh
+# version 0.1
+# rapid script to test cluster
+# dirty script i know
+
+####################################
+# color 
+####################################
+SUCCESS=`echo -en "\\033[1;32mSUCCESS\\033[0;32m"`
+WARNING=`echo -en "\\033[1;33mERROR\\033[0;32m"`
+
+NB_NODES=`cat /etc/nodes_list | wc -l`
+echo " Found $NB_NODES"
+
+testret() {
+if [ $RETVAL -eq 0 ]; then 
+	echo $SUCCESS 
+	else echo $WARNING 
+fi
+}
+
+clear
+echo
+echo " - Installing all needed packages on server side"
+su root -c "urpmi bps povray-pvm povray-mpich lam-runtime"
+RETVAL=$? ; testret
+
+echo 
+echo "-----------"
+echo " - Installing all needed packages on nodes using urpmi parallel"
+su - root -c "urpmi -v --parallel cluster distcc povray-mpich povray-pvm"
+RETVAL=$? ; testret
+
+
+echo
+echo " - Copying needed files"
+cp -fa /usr/share/doc/povray-pvm-3.1g/sample/* ~/
+cp -fa /usr/share/doc/povray-mpich-3.1g/sample/* ~/
+cp -fa /usr/share/doc/mpich-1.2.5/test_mpi.mpich ~/
+cp -fa /usr/share/doc/*PBS*/para_job_pbs.sh ~/
+cp -fa /var/lib/mpi/test_mpi.lam ~/
+
+echo
+echo " - Testing PBS and Maui scheduler"
+cat > test_job_pbs.sh <<EOF
+#PBS -N test_job_pbs 
+#PBS -q small 
+#PBS -l nodes="$NB_NODES"
+#PBS -o testpbs.log
+#PBS -e testpbs.err
+echo "###################################################################"
+echo "Starting on `hostname` at `date`"
+echo ""
+echo "Output of ended jobs"
+echo "--------------------"
+mpirun -np $NB_NODES ./test_mpi.mpich
+echo 
+echo "Job Ended at `date`"
+echo "###################################################################" 
+# Exit
+exit 0
+EOF
+
+qsub ~/test_job_pbs.sh
+sleep 5
+qstat
+echo
+
+echo " - Displaying logs if they exist" 
+if [ -f ~/testpbs.log ]; then cat ~/testpbs.log ; fi
+if [ -f ~/testpbs.err ]; then cat ~/testpbs.err ; fi
+
+echo
+echo "-----------"
+echo " - Testing MPICH"
+mpirun -np $NB_NODES ~/./test_mpi.mpich
+RETVAL=$? ; testret
+
+echo
+echo "-----------"
+echo " - Testing Pvm"
+for i in `seq 1 $NB_NODES`
+do
+pvm <<EOF
+add nc$i
+quit
+EOF
+done
+pvm <<EOF
+conf
+EOF
+~/./chessItPvm
+
+echo
+echo "-----------"
+echo " - Testing LAM/MPI"
+lamboot
+mpirun-lam -np $NB_NODES /var/lib/mpi/test_mpi.lam
+RETVAL=$? ; testret
+lamhalt
+
+echo
+echo "-----------"
+echo " - Testing rshp"
+rshpn -v uptime
+RETVAL=$? ; testret
+sleep 5
+
+echo
+echo "-----------"
+echo " - Testing gexec"
+gexec -n 0 uptime
+RETVAL=$? ; testret
+sleep 5
+
+echo
+echo "-----------"
+echo " - Setting bps environnement"
+cp -av /var/lib/bps/ ~/
+export BPSDIR=~/bps
+
+echo 
+echo "-----------"
+echo " - Launching bps test"
+echo " ---- Cofee Time ! ----"
+echo 
+~/bps/src/bps -b
+RETVAL=$? ; testret
+~/bps/src/bps -s
+RETVAL=$? ; testret
+~/bps/src/bps -u
+RETVAL=$? ; testret
+~/bps/src/bps -m
+RETVAL=$? ; testret
+
+echo
+echo "-----------"
+echo " - Launching ~/bps/src/bps to try other test"
+echo
+echo " This is the end"

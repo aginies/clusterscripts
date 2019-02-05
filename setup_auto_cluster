@@ -1,0 +1,165 @@
+#!/bin/sh
+# aginies at mandriva.com
+# version: 0.3 
+
+## color
+if [ "$1" = "" ]; then
+    NORMAL=`echo -en "\\033[0;32m"`
+    SUCCESS=`echo -en "\\033[1;32m"`
+    INFO=`echo -en "\\033[1;34m"`
+    WARNING=`echo -en "\\033[1;33m"`
+    WHITE=`echo -en "\\033[0;39m"`
+else 
+    NORMAL=
+    SUCCESS=
+    INFO=
+    WARNING=
+    WHITE=
+fi
+
+UBIN="/usr/bin"
+TMPLOG="/tmp/log"
+FIRST="/tmp/first_setup"
+CONFFILE=/etc/clusterserver.conf
+
+rm -rf ${TMPLOG}
+mkdir -p ${TMPLOG}
+rm -rf  /tmp/nocd
+
+if [ -e $FIRST ];then 
+       	if [ -f "/usr/sbin/draktab_config" ]; then
+	draktab_config
+	fi
+	rm -rf $FIRST
+fi
+
+clear
+echo " |---------------------------------|" 
+echo " |   AUTO SETUP CLUSTER SERVER !   |"
+echo " |---------------------------------|"
+echo 
+echo " You can adjust your var in $CONFFILE"
+echo
+echo " This script is going to automaticaly execute in order:"
+echo " setup_install_cluster.pl doall"
+echo " setup_server_cluster.pl gennodeone"
+echo " setup_server_cluster.pl doall"
+echo " setup_dns.pl master"
+echo " setup_nis.pl set_server"
+echo " setup_dhcpdconf_server.pl doall"
+echo " setup_pxe_server.pl build"
+echo " setup_pxe_server.pl boot autohttp"
+echo " setup_admin.pl doall"
+#echo " setup_compute.pl doall"
+#echo " setup_postfix.pl set"
+echo " oar_db_init"
+#echo " setup_add_nodes_to_dhcp.pl -n number_of_nodes"
+echo
+read
+
+launch_script() {
+        if [ -f /tmp/nocd ]; then break ; exit; fi
+        clear
+        rm -f ${TMPLOG}/${1}.log
+        echo ${INFO}
+        echo
+        echo "  ---------------------------------"
+        echo "   LAUNCH: ${1}"
+        echo
+        echo "   LOG can be found in:"
+        echo "   ${TMPLOG}/${1}.log"
+        echo "  ---------------------------------"
+        echo 
+        sleep 2
+        echo ${NORMAL}
+        ${UBIN}/${1} ${2} ${3} 2> ${TMPLOG}/${1}.log
+
+# test size of the log
+SIZELOG=`du -s ${TMPLOG}/${1}.log | awk '{print $1}'`
+if [ "${SIZELOG}" -eq "0" ]; then
+        rm -f ${TMPLOG}/${1}.log
+fi
+}
+
+test_script_log() {
+if [ -f "${TMPLOG}/${1}.log" ]; then
+        echo ${WARNING}
+        echo 
+        echo "     ${1} finish with LOG"
+        echo "     Look in ${TMPLOG}/${1}.log for more information"
+        echo
+        echo " (press ENTER key to continue)"
+        read
+        echo ${NORMAL}
+else
+        echo ${SUCCESS}
+        echo  
+        echo " ${1} finish with SUCCESS"
+        echo
+        echo " (press ENTER key to continue)"
+        read
+        echo ${NORMAL}
+fi
+}
+
+echo
+
+launch_script setup_server_cluster.pl gennodeone
+
+launch_script setup_server_cluster.pl doall
+test_script_log setup_server_cluster.pl
+
+launch_script setup_dns.pl master
+test_script_log setup_dns.pl
+
+launch_script setup_nis.pl set_server
+test_script_log setup_nis.pl
+
+launch_script setup_dhcpdconf_server.pl doall
+test_script_log setup_dhcpdconf_server
+
+launch_script setup_pxe_server.pl build
+launch_script setup_pxe_server.pl boot autohttp
+test_script_log setup_pxe_server
+
+launch_script setup_admin.pl doall
+test_script_log setup_admin.pl
+
+clear
+echo
+echo " |-------------------------------------------|" 
+echo " | Initialisation of oar Database            |"
+echo " | Admin login is root user without password |"
+echo " |-------------------------------------------|" 
+echo
+service mysqld restart
+oar_db_init
+service oar-server restart
+
+clear
+
+#echo "add user admin (smartd)\n";
+#adduserNis.pl -l admin -p "\$1\$pNpuzDnO\$iZIgCN/LNI41GhqY9son50"
+#echo " - Please enter admin user password:"
+#passwd admin
+
+#echo "rebuilding NIS map"
+#cd /var/yp
+#make
+
+clear
+echo ${INFO}
+TESTLOG=`ls ${TMPLOG}/ | grep log`
+if [ ! -z "${TESTLOG}" ]; then
+        echo " found log(s) in ${TMPLOG}:"
+        ls ${TMPLOG}/*.log
+fi
+echo ${WHITE} 
+echo " Server ${SUCCESS}READY${WHITE}, now install a client"
+echo
+echo " Install a golden node and replicate it with ka tools"
+echo
+
+echo " (press ENTER key to exit)"
+read
+exit

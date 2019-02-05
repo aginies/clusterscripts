@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# clusterautosetup       This auto setup client nodes 
+#
+# chkconfig: 345 15 15
+# description: autosetup client node 
+#
+# processname: clusterautosetup 
+# version: 1.0
+
+# Source the library functions
+. /etc/rc.d/init.d/functions
+
+SETUP_CLI="/usr/bin/setup_client_cluster.pl"
+
+# let see how we were called
+case "$1" in
+    keys) 
+	gprintf "retrieve Keys: "
+	${SETUP_CLI} retrieve_key
+	${SETUP_CLI} update_authdkey_client
+	${SETUP_CLI} update_sshkey_client
+	;;
+    service)
+	gprintf "reconfigure service: "
+	${SETUP_CLI} service_adjust
+	;;
+    mpilam)
+	gprintf "reconfigure MPI and lam: "
+	${SETUP_CLI} retrieve_mpi_lam
+	${SETUP_CLI} update_mpi_lam
+	;;
+    nis)
+	gprintf "reconfigure NIS: "
+	${SETUP_CLI} nis_config
+	;;
+    start)
+	${SETUP_CLI} doall
+	;;
+    stop)
+	gprintf "just for fun..."
+	;;
+    reload)
+	${SETUP_CLI} reload_c
+	;;
+    time)
+	${SETUP_CLI} sync_time
+	;;
+    *)
+	gprintf "Usage: clusterautosetup {keys|service|mpilam|nis|start|time}\n"
+	exit 1
+esac

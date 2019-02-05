@@ -1,0 +1,91 @@
+#!/bin/sh
+# version 0.3 
+# see , share, flush
+# Source function library.
+echo 1 > /proc/sys/net/ipv4/ip_forward
+
+. /etc/rc.d/init.d/functions
+
+CONFFILE="/etc/clusterserver.conf"
+if  [ ! -f ${CONFFILE} ]; then
+        echo "Cant find ${CONFFILE} !"
+        exit 1
+	fi
+. ${CONFFILE}
+		
+SSH_PORT=22
+WEB_PORT=80
+
+IPCLUSTER=`/sbin/ifconfig ${ADMIN_INTERFACE} | grep "inet ad" | sed -e "s/\\ Bcast.*$//; s/.*://" | sed -e "s/ //"`
+IPEXTERNAL=`/sbin/ifconfig ${EXTERNAL_INTERFACE} | grep "inet ad" | sed -e "s/\\ Bcast.*$//; s/.*://" | sed -e "s/ //"`
+IPBASE_CLUSTER="`echo ${IPCLUSTER} | awk -F. '{print $1"."$2"."$3}'`"
+IPBASE_EXTERNAL="`echo ${IPEXTERNAL} | awk -F. '{print $1"."$2"."$3}'`"
+
+IPTABLES="/sbin/iptables"
+
+forward() {
+echo "Activating forward"
+echo 1 > /proc/sys/net/ipv4/ip_forward
+if [ -e /proc/sys/net/ipv4/conf/all/accept_source_route ]; then
+      echo 1 > /proc/sys/net/ipv4/conf/all/accept_source_route
+fi
+}
+
+default_rules() {
+echo "Setting default rules"
+$IPTABLES -P INPUT DROP
+$IPTABLES -P FORWARD DROP
+$IPTABLES -P OUTPUT ACCEPT
+$IPTABLES -A FORWARD -f -j ACCEPT
+$IPTABLES -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+$IPTABLES -A INPUT -m state --state NEW -i ! $EXTERNAL_INTERFACE -j ACCEPT
+}
+
+input_rules() {
+echo "Setting rules"
+echo " |- Accepting ssh"
+$IPTABLES -A INPUT -p tcp -i $EXTERNAL_INTERFACE --dport $SSH_PORT -j ACCEPT
+echo " |- Accepting Web on port $WEB_PORT"
+$IPTABLES -A INPUT -p tcp -i $EXTERNAL_INTERFACE --dport $WEB_PORT -j ACCEPT
+}
+
+masquerade() {
+action "Postrouting ${IPBASE_CLUSTER} " ${IPTABLES} -t nat -A POSTROUTING -o ${ADMIN_INTERFACE} -j MASQUERADE
+action "Postrouting ${IPBASE_EXTERNAL}" ${IPTABLES} -t nat -A POSTROUTING -o ${EXTERNAL_INTERFACE} -j MASQUERADE
+}
+
+case $1 in
+    see)
+	gprintf " - Filter rules" 
+	${IPTABLES} -L -t filter -v -n
+	echo
+	gprintf " - NAT rules" 
+	${IPTABLES} -L -t nat -v -n
+	#gprintf "Mangle regles"
+	#iptables -L -t mangle -v -n
+	# echo
+	gprintf " -end-"
+	;;
+    
+    fwmasq)
+	$0 flush
+	forward
+	default_rules
+	masquerade
+	input_rules
+	;;
+    
+    share)
+	$0 flush
+	forward
+	masquerade
+	;;
+    
+    flush)
+	service iptables stop
+	;;
+    
+    *)
+	gprintf "usage rapidfirewall : {see|share|fwmasq|flush}\n"
+	;;
+esac

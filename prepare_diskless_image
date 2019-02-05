@@ -1,0 +1,243 @@
+#!/bin/sh
+# aginies ___ateu_ mdv.com
+# quick script to setup a cluster chroot
+# and create a dolly image
+# first arg can be the name of wanted RPMS
+
+# path to the chroot
+CHROOT=/root/chroot_test/
+CHROOT2=/root/chroot_test/squashfs-root
+HOSTNAME=`hostname`
+# path to the distribution use by urpmi --use-distrib
+DISTRIB=/mnt/install/cooker/i586
+
+# full path to get the replication image
+REPLI=/usr/lib/replication/install/stage2/replication.sqfs
+# temp ISO
+
+# image and path to image
+img=diskless_node.img
+PATH_MOUNT=/tmp/diskless_node
+
+# mandatory RPMS !
+#MANDATORY="net-tools passwd clusterscripts-client kernel-desktop-latest lam mpich openssh-server ganglia-core"
+MANDATORY="setup net-tools passwd openssh-server basesystem-minimal udev rpcbind"
+
+mkdir -p $TLOOP $PATH_MOUNT $CHROOT
+
+case $1 in
+    create|c)
+	shift	
+	;;
+    *)
+    	echo " Usage:"
+	echo " $0 create package_name package_name2"
+	echo
+	echo "Auto installed RPMS are:"
+	echo $MANDATORY
+	exit 1
+	;;
+esac
+
+# first arg is list of wanted RPMS
+WANTED=$*
+
+
+clean_chroot() {
+    echo " - cleaning old chroot"
+    if [ ! $CHROOT ];then exit 1; fi
+    rm -rf $CHROOT/*
+    rm -rf $CHROOT2/*
+}
+
+need_repli() {
+    echo " - needed a basesystem based on rescue (replication package)"
+    if [ ! -f "/usr/bin/unsquashfs" ]; then urpmi squashfs-tools ; fi
+    cd $CHROOT
+    unsquashfs $REPLI
+    echo " - Copy existing /dev"
+    cp -af /dev/* $CHROOT2/dev/
+    cd ..
+}
+
+install_rpm() {
+    echo " - install wanted RPMS"
+    echo "mandatory RPMS: $MANDATORY"
+    echo "user choice: $WANTED"
+    urpmi --no-suggests --auto --use-distrib $DISTRIB --excludedocs --no-verify-rpm --root $CHROOT2 setup
+    urpmi --no-suggests --auto --use-distrib $DISTRIB --excludedocs --no-verify-rpm --root $CHROOT2 $MANDATORY $WANTED
+}
+
+adjust_scripts() {
+    echo " - special rc.sysinit and go scripts"
+    if [ ! -f "/etc/rc.sysinit_diskless" ];then echo "can't find /etc/rc.sysinit_diskless !" ; exit 1; fi
+    cp -avf /etc/rc.sysinit_diskless $CHROOT2/etc/rc.sysinit
+    chmod 755 $CHROOT2/etc/rc.sysinit
+    cp -avf /etc/profile $CHROOT2/etc/profile
+    echo "clear" >> $CHROOT2/etc/profile
+    echo 'export PS1="[\u@\h \W]\$ "' >> $CHROOT2/etc/profile
+    echo 'export TERM=xterm' >> $CHROOT2/etc/profile
+    echo "echo  --                       --- " >> $CHROOT2/etc/profile
+    echo "echo  -- CLUSTER diskless mode --- " >> $CHROOT2/etc/profile
+    echo "echo  --                       --- " >> $CHROOT2/etc/profile
+    echo "echo" >> $CHROOT2/etc/profile
+    
+
+    cat >$CHROOT2/ka/go<<EOF
+#!/bin/sh
+service udev-post start
+service rpcbind start
+#setup_client_cluster.pl doall
+#service ypbind start
+#service autofs start
+#service authd start
+service gmond start
+#service xinetd start
+service sshd start
+EOF
+
+    echo "SWAP=\$(lsparts | grep swap | cut -d ":" -f 1)" >> $CHROOT2/ka/go
+    echo "swapon -v /dev/\$SWAP" >> $CHROOT2/ka/go
+
+    chmod 755 $CHROOT2/ka/go
+    mkdir $CHROOT2/root
+    cp -avf /root/.bashrc $CHROOT2/root/
+    mkdir -p $CHROOT2/var/lock/subsys/
+    touch $CHROOT2/etc/mandriva-release
+    echo "none /dev/pts devpts defaults 0 0" >> $CHROOT2/etc/fstab
+# can connect on nodes with empty password and connect as root
+    echo "PermitEmptyPasswords yes" >> $CHROOT2/etc/ssh/sshd_config
+    perl -pi -e "s|PermitRootLogin.*|PermitRootLogin yes|" $CHROOT2/etc/ssh/sshd_config
+    chroot $CHROOT2 /usr/sbin/useradd nobody -d /tmp/nobody -u 1285
+    chroot $CHROOT2 /usr/sbin/groupadd -g 100 all
+    chroot $CHROOT2 pwconv
+    chmod 777 $CHROOT2/tmp
+}
+
+remove_X() {
+    echo
+    echo " ??? - Do you want to remove all X componments ? (y/n)"
+    read AN
+    if [ -f "$CHROOT2/usr/X11R6/bin/mpi-x-povray" ]; then AN="no" ;fi
+    if [ -f "$CHROOT2/usr/bin/blender" ]; then AN="no" ;fi
+    if [ $AN == "y" ]; then
+	echo " "
+	rm -rf $CHROOT2/usr/X11R6
+        rm -rf $CHROOT2/etc/X11
+    fi
+}
+
+
+reduce_chroot_size() {
+    echo " - try to reduce the size of the chroot"
+    rm -rf $CHROOT2/usr/share/doc
+    rm -rf $CHROOT2/boot/*
+    rm -rf $CHROOT2/core*
+#    rm -rf $CHROOT2/lib/modules/2.6.12-28mdksmp/kernel/sound
+    rm -rf $CHROOT2/lib/grub
+    rm -rf $CHROOT2/usr/share/man
+    rm -rf $CHROOT2/usr/share/mdk/backgrounds
+    rm -rf $CHROOT2/usr/share/gtk-doc/html/pango/*.png
+    rm -rf $CHROOT2/usr/share/gtk-doc/html
+#    rm -rf $CHROOT2/usr/lib/perl5/5.8.7/unicore/*.txt
+    remove_X
+}
+
+remove_rpm() {
+    echo " - remove unwanted RPM"
+    chroot $CHROOT2 rpm -e --nodeps -a \
+	desktop-common-data mandriva-theme-screensaver \
+	qiv mkinitrd libpango1 libcairo2 libatk1.0_0 libgpm1 \
+	rpm-mandriva-setup popt-data chkconfig cloop-utils smartmontools mandriva-theme \
+	bootsplash wireless-tools sound-scripts gcc-cpp aumix-text soundwrapper mdk-menu-messages \
+	clone urpmi fbgrab gexec authd logrotate crontabs cronie 
+}
+
+clean_rpmdatabase() {
+    echo " - now we can clean the RPM database"
+    rm -rf $CHROOT2/usr/share/rpm-helper
+    rm -rf $CHROOT2/usr/lib/rpm
+    rm -rf $CHROOT2/var/lib/rpm
+}
+
+chroot_size() {
+    echo " - size of chroot:"
+    du -sh $CHROOT2
+}
+
+time_to_change() {
+    echo 
+    echo
+    echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+    echo " If you want to change something in the chroot, do it now"
+    echo $CHROOT2
+    echo "Else just press [ENTER]"
+    echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+    read
+}
+
+create_image() {
+    echo " - create image $img"
+    SIZE=`du -sh $CHROOT2 | cut -d "M" -f 1`
+    
+    dd if=/dev/zero of=$img count=${SIZE}900 bs=1096
+    
+    echo " - format image $img"
+    mkfs.ext2 -F -m 0 -L "cluster diskless" $img
+
+    echo " - mount loop $img"
+    mount -o loop $img $PATH_MOUNT
+    
+    echo " - copy all data to image"
+    cp -a $CHROOT2/* $PATH_MOUNT
+
+    echo " - umount $img"
+    umount $PATH_MOUNT
+    
+    echo " - size of $img"
+    du -h $img
+
+    echo " - if you want to edit your diskless image, just mount it loop:"
+    echo "mount -o loop $img $PATH_MOUNT"
+}
+
+end() {
+    echo " - create dolly conf like this one:"
+    echo "----------------------------"
+    echo "infile /root/$img
+outfile /dev/ram3
+server $HOSTNAME
+firstclient 12.12.12.1
+lastclient 12.12.12.3
+clients 3
+12.12.12.1
+12.12.12.2
+12.12.12.3
+endconfig"
+    echo "----------------------------"
+
+    echo
+    echo " - Set your PXE server default boot to dolly"
+    echo " ! DONT forget to adjust the ramsize parameter !"
+    echo " more than: ramsize_disk=$SIZE"
+    echo 
+    echo " - now launch dolly to copy diskless image on nodes:"
+    echo "----------------------------"
+    echo "dolly -v -s -f dolly.cfg"
+    echo "----------------------------"
+    echo
+}
+
+
+# main
+clean_chroot
+need_repli
+install_rpm
+adjust_scripts
+reduce_chroot_size
+#remove_rpm
+#clean_rpmdatabase
+time_to_change
+chroot_size
+create_image
+end

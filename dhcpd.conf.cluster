@@ -1,0 +1,142 @@
+# for explanation in french go to : http://www.delafond.org/traducmanfr/man/man5/dhcpd.conf.5.html
+ddns-update-style none;
+allow booting;
+allow bootp;
+
+# Your dhcp server is not master on your network !
+#not authoritative;
+# Your dhcpd server is master on your network !
+#authoritative;
+not authoritative;
+
+#Interface where dhcpd is active
+#DHCPD_INTERFACE = "eth0";
+
+# Definition of PXE-specific options
+# Code 1: Multicast IP address of bootfile
+# Code 2: UDP port that client should monitor for MTFTP responses
+# Code 3: UDP port that MTFTP servers are using to listen for MTFTP requests
+# Code 4: Number of secondes a client must listen for activity before trying
+#         to start a new MTFTP transfer
+# Code 5: Number of secondes a client must listen before trying to restart
+#         a MTFTP transfer
+
+# define Option for the PXE class
+option space PXE;
+option PXE.mtftp-ip code 1 = ip-address;
+option PXE.mtftp-cport code 2 = unsigned integer 16;
+option PXE.mtftp-sport code 3 = unsigned integer 16;
+option PXE.mtftp-tmout code 4 = unsigned integer 8;
+option PXE.mtftp-delay code 5 = unsigned integer 8;
+option PXE.discovery-control code 6 = unsigned integer 8;
+option PXE.discovery-mcast-addr code 7 = ip-address;
+
+#Define options for pxelinux
+option space pxelinux;
+option pxelinux.magic      code 208 = string;
+option pxelinux.configfile code 209 = text;
+option pxelinux.pathprefix code 210 = text;
+option pxelinux.reboottime code 211 = unsigned integer 32;
+site-option-space "pxelinux";
+# These lines should be customized to your setup
+#option pxelinux.configfile "configs/common";
+#option pxelinux.pathprefix "/pxelinux/files/";
+#filename "/pxelinux/pxelinux.bin";
+				
+option pxelinux.magic f1:00:74:7e;
+option pxelinux.reboottime 30;
+#if exists dhcp-parameter-request-list {
+# Always send the PXELINUX options
+#	append dhcp-parameter-request-list 208, 209, 210, 211;
+#	append dhcp-parameter-request-list 208,211;
+#					}
+
+#Class that determine the options for Etherboot 5.x requests
+class "Etherboot" {
+
+#if The vendor-class-identifier equal Etherboot-5.0
+match if substring (option vendor-class-identifier, 0, 13) = "Etherboot-5.0";
+
+# filename define the file retrieve by the client, there nbgrub
+# our tftp is chrooted so is just the path to the file
+filename "/etherboot/nbgrub";
+
+#Used by etherboot to detect a valid pxe dhcp server
+option vendor-encapsulated-options 3c:09:45:74:68:65:72:62:6f:6f:74:ff;
+
+# Set the  "vendor-class-identifier" field to "PXEClient" in dhcp answer        
+# if this field is not set the pxe client will ignore the answer !
+option vendor-class-identifier "Etherboot-5.0";
+
+vendor-option-space PXE;
+option PXE.mtftp-ip 0.0.0.0;
+
+# IP of you TFTP server
+next-server 192.168.200.10;
+}
+
+
+# create the Class PXE
+class "PXE" {
+# if the "vendor-class-identifier" is set to "PXEClient" in the client dhcp request
+match if substring(option vendor-class-identifier, 0, 9) = "PXEClient";
+  
+# filename define the file retrieve by the client, there pxelinux.0
+# our tftp is chrooted so is just the path to the file
+# If you prefer use grub, use pxegrub compiled for your ethernet card.
+#filename "/PXEClient/pxegrub";
+filename "/X86PC/linux/linux.0";
+
+# Set the  "vendor-class-identifier" field to "PXEClient" in dhcp answer
+# if this field is not set the pxe client will ignore the answer !
+option vendor-class-identifier "PXEClient";
+
+				  
+vendor-option-space PXE;
+option PXE.mtftp-ip 0.0.0.0;
+
+# IP of you TFTP server
+next-server 192.168.200.10;
+}
+
+# Tags uses by dhcpnode and setup_add_nodes_to_dhcp
+# TAG: NODE_LIST_ADMIN_BEGIN
+
+# TAG: NODE_LIST_ADMIN_END
+
+# TAG: NODE_LIST_COMPUTE_BEGIN
+
+# TAG: NODE_LIST_COMPUTE_END
+
+# TAG: MY_ADMIN_BEGIN
+subnet 192.168.200.0 netmask 255.255.255.0 {
+  option subnet-mask 255.255.255.0;
+  option routers 192.168.200.1;
+  default-lease-time 288000;
+  max-lease-time 864000;
+  option domain-name "mandrakesoft.com";
+  option domain-name-servers  192.168.100.11; 
+# Used by clusterautosetup-client to find its server
+  next-server 192.168.200.10;
+   
+  pool { 
+    range 192.168.200.10 192.168.200.99;
+  }
+}
+
+# TAG: MY_ADMIN_END
+
+# TAG: MY_COMPUTE_BEGIN
+subnet 192.168.200.0 netmask 255.255.255.0 {
+  option subnet-mask 255.255.255.0;
+  default-lease-time 288000;
+  max-lease-time 864000;
+  option domain-name "mandrakesoft.com";
+  option domain-name-servers  192.168.100.11; 
+   
+  pool { 
+    deny members of "PXE";
+    range 192.168.200.10 192.168.200.99;
+  }
+}
+# TAG: MY_COMPUTE_END

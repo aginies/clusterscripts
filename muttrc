@@ -1,0 +1,113 @@
+#set mbox=~/mbox
+set folder=~/Mail
+set spoolfile=/var/spool/mail/$USER
+mailboxes `sh -c "/bin/ls -1 ~/Mail|grep -v 'Sent'|grep -v 'postponed'|sed -n 's#^#=#p'|xargs"`
+
+set move=no
+set copy
+set record=~/Mail/Sent
+set nobeep
+set quit=yes
+set include=yes
+
+set indent_string="> "		# how to quote replied text
+set signature="~/.signature"
+#source ~/.mutt/aliases.rc 
+#set alias_file="~/.mutt/aliases.rc"
+
+set date_format="(%d/%m/%y %H:%M)"
+unset check_new
+set timeout=60
+
+set pager_index_lines=6
+folder-hook "Sent" set sort=date
+
+#my_hdr realname: Developper cluster
+#my_hdr From: cooker@mandrakesoft.com
+#my_hdr  Reply-To: cooker@mandrakesoft.com
+my_hdr X-Operating-System: `uname -a`
+#folder-hook . set sort=date-sent
+folder-hook . set sort=threads 
+folder-hook . set collapse-all
+#my_hdr Organization: clustering.com 
+
+# Color definitions
+#
+# Couleur de la barre de sélection
+color indicator   brightyellow    red
+# Couleur des messages d'erreur
+color error       brightred       default
+# Couleur des indicateurs en haut et en bas de la fenêtre
+color status      brightwhite     blue
+# Couleur de l'arbre des threads
+color tree        brightmagenta   default
+
+# Couleur des headers
+color header      white           default "^date:"
+color header      brightgreen     default "^from:"
+color header      brightwhite     default "^to:"
+color header      brightblue      default "^cc:"
+color header      brightyellow    default "^subject:"
+color header      cyan            default "^resent-"
+color header      cyan            default "^x-"
+color header      cyan            default "^User-Agent"
+
+# Couleur du texte cité
+color quoted      green           default
+# Couleur de la signature
+color signature   brightred       default
+# Couleur des URLs
+color body        magenta         default "(ftp|http|gopher|wais|file)://[^ ()<>,]+"
+# Couleur des adresses e-mail
+color body        magenta         default "[-a-z_0-9.]+@[-a-z_0-9.]+"
+# Couleur des smileys
+color body        brightyellow    black "[:]+[-^o]?[])>}D]+"
+color body        brightgreen     black "([:;]+[-^o]?[Pp]+)|([;][-^o]?[])>}D]+)"
+color body        brightred       black "[:;]+[-^o]?[[(<{|/\\]+"
+color hdrdefault red default
+color error brightred default
+color tree magenta default	# the thread tree in the index menu
+color message brightcyan default
+color markers brightcyan default
+color attachment brightmagenta default
+color search default green	# how to hilite search patterns in the
+color underline brightgreen default
+
+# attributes when using a mono terminal
+mono quoted bold
+
+auto_view text/x-vcard
+auto_view text/html
+auto_view application/x-tar-gz
+alternative_order text/plain 
+
+bind   index   <insert>       next-unread
+bind   pager   <insert>       next-unread
+
+# Décode les fichiers attachés de type application/pgp
+set pgp_decode_command="/usr/bin/gpg   --status-fd=2 %?p?--passphrase-fd 0? --no-verbose --quiet  --batch  --output - %f"
+# Vérifie les signatures pgp/mime
+set pgp_verify_command="/usr/bin/gpg   --status-fd=2 --no-verbose --quiet  --batch  --output - --verify %s %f"
+# Décrypte les fichiers attachés pgp/mime
+set pgp_decrypt_command="/usr/bin/gpg   --status-fd=2 --passphrase-fd 0 --no-verbose --quiet  --batch  --output - %f"
+# Crée un fichier attaché pgp/mime signé
+set pgp_sign_command="/usr/bin/gpg    --no-verbose --batch --quiet   --output - --passphrase-fd 0 --armor --detach-sign --textmode %?a?-u %a? %f"
+# Crée un fichier attaché application/pgp signé (old-style)
+set pgp_clearsign_command="/usr/bin/gpg   --no-verbose --batch --quiet   --output - --passphrase-fd 0 --armor --textmode --clearsign %?a?-u %a? %f"
+# Crée un fichier attaché pgp/mime crypté
+set pgp_encrypt_only_command="/usr/lib/mutt/pgpewrap /usr/bin/gpg    --batch  --quiet  --no-verbose --output - --encrypt --textmode --armor --always-trust -- -r %r -- %f"
+# Crée un fichier attaché pgp/mime crypté et signé
+set pgp_encrypt_sign_command="/usr/lib/mutt/pgpewrap /usr/bin/gpg  --passphrase-fd 0  --batch --quiet  --no-verbose  --textmode --output - --encrypt --sign %?a?-u %a? --armor --always-trust -- -r %r -- %f"
+# Importe une clé dans mon trousseau de clés publiques (pubring)
+set pgp_import_command="/usr/bin/gpg  --no-verbose --import -v %f"
+# Exporte un clé depuis mon trousseau de clés publiques (pubring)
+set pgp_export_command="/usr/bin/gpg   --no-verbose --export --armor %r"
+# Vérifie une clé
+set pgp_verify_key_command="/usr/bin/gpg   --verbose --batch  --fingerprint --check-sigs %r"
+# Lit dans le trousseau de clés publiques (pubring)
+set pgp_list_pubring_command="/usr/bin/gpg   --no-verbose --batch --quiet   --with-colons --list-keys %r" 
+# Lit dans le trousseau de clés secrètes
+set pgp_list_secring_command="/usr/bin/gpg   --no-verbose --batch --quiet   --with-colons --list-secret-keys %r" 
+# fetch keys
+# set pgp_getkeys_command="pkspxycwrap %r"
+set pgp_getkeys_command=""

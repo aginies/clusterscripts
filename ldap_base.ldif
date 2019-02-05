@@ -1,0 +1,219 @@
+# extended LDIF
+#
+# LDAPv3
+# base <dc=cluster,dc=com> with scope subtree
+# filter: (objectclass=*)
+# requesting: ALL
+#
+
+# cluster.com
+dn: dc=cluster,dc=com
+dc: cluster
+objectClass: domain
+objectClass: domainRelatedObject
+associatedDomain: cluster.com
+
+# People, cluster.com
+dn: ou=People,dc=cluster,dc=com
+ou: People
+objectClass: organizationalUnit
+
+# Group, cluster.com
+dn: ou=Group,dc=cluster,dc=com
+ou: Group
+objectClass: organizationalUnit
+description: Container for group accounts
+
+# System Accounts, cluster.com
+dn: ou=System Accounts,dc=cluster,dc=com
+ou: System Accounts
+objectClass: organizationalUnit
+description: Container for System and Services privileged accounts
+
+# System Groups, cluster.com
+dn: ou=System Groups,dc=cluster,dc=com
+ou: System Groups
+objectClass: organizationalUnit
+description: Container for System and Services privileged groups
+
+# Hosts, cluster.com
+dn: ou=Hosts,dc=cluster,dc=com
+ou: Hosts
+objectClass: organizationalUnit
+description: Container for Samba machine accounts
+
+# Address Book, cluster.com
+dn: ou=Address Book,dc=cluster,dc=com
+ou: Address Book
+objectClass: organizationalUnit
+description: Container for global address book entries
+
+# sudoers, cluster.com
+dn: ou=sudoers,dc=cluster,dc=com
+ou: sudoers
+objectClass: organizationalUnit
+description: Container for sudo related entries
+
+# dhcp, cluster.com
+dn: ou=dhcp,dc=cluster,dc=com
+ou: dhcp
+objectClass: organizationalUnit
+description: Container for DHCP related entries
+
+# dns, cluster.com
+dn: ou=dns,dc=cluster,dc=com
+ou: dns
+objectClass: organizationalUnit
+description: Container for DNS related entries
+
+# Password Policies, cluster.com
+dn: ou=Password Policies,dc=cluster,dc=com
+ou: Password Policies
+objectClass: organizationalUnit
+description: Container for OpenLDAP password policies
+
+# LDAP Admins, System Groups, cluster.com
+dn: cn=LDAP Admins,ou=System Groups,dc=cluster,dc=com
+cn: LDAP Admins
+objectClass: groupOfNames
+description: Members can administer all parts of the Directory
+owner: uid=LDAP Admin,ou=System Accounts,dc=cluster,dc=com
+member: uid=LDAP Admin,ou=System Accounts,dc=cluster,dc=com
+member: uid=aginies,ou=People,dc=cluster,dc=com
+
+# Account Admins, System Groups, cluster.com
+dn: cn=Account Admins,ou=System Groups,dc=cluster,dc=com
+cn: Account Admins
+objectClass: groupOfNames
+description: Members can administer all user, group and machine accounts
+owner: uid=Account Admin,ou=System Accounts,dc=cluster,dc=com
+member: uid=Account Admin,ou=System Accounts,dc=cluster,dc=com
+member: uid=aginies,ou=people,dc=cluster,dc=com
+
+# Sudo Admins, System Groups, cluster.com
+dn: cn=Sudo Admins,ou=System Groups,dc=cluster,dc=com
+cn: Sudo Admins
+objectClass: groupOfNames
+description: Members can administer ou=sudoers entries and attributes
+owner: uid=Sudo Admin,ou=System Accounts,dc=cluster,dc=com
+member: uid=Sudo Admin,ou=System Accounts,dc=cluster,dc=com
+member: cn=Account Admins,ou=System Groups,dc=cluster,dc=com
+
+# DNS Admins, System Groups, cluster.com
+dn: cn=DNS Admins,ou=System Groups,dc=cluster,dc=com
+cn: DNS Admins
+objectClass: groupOfNames
+description: Members can administer ou=DNS entries and attributes
+owner: uid=DNS Admin,ou=System Accounts,dc=cluster,dc=com
+member: uid=DNS Admin,ou=System Accounts,dc=cluster,dc=com
+
+# DHCP Admins, System Groups, cluster.com
+dn: cn=DHCP Admins,ou=System Groups,dc=cluster,dc=com
+cn: DHCP Admins
+objectClass: groupOfNames
+description: Members can administer ou=DHCP entries and attributes
+owner: uid=DHCP Admin,ou=System Accounts,dc=cluster,dc=com
+member: uid=DHCP Admin,ou=System Accounts,dc=cluster,dc=com
+
+# DHCP Readers, System Groups, cluster.com
+dn: cn=DHCP Readers,ou=System Groups,dc=cluster,dc=com
+cn: DHCP Readers
+objectClass: groupOfNames
+description: Members can read entries and attributes under ou=dhcp
+owner: uid=DHCP Admin,ou=System Accounts,dc=cluster,dc=com
+member: uid=DHCP Reader,ou=System Accounts,dc=cluster,dc=com
+
+# Address Book Admins, System Groups, cluster.com
+dn: cn=Address Book Admins,ou=System Groups,dc=cluster,dc=com
+cn: Address Book Admins
+objectClass: groupOfNames
+description: Members can administer ou=Address Book entries and attributes
+owner: uid=Address Book Admin,ou=System Accounts,dc=cluster,dc=com
+member: uid=Address Book Admin,ou=System Accounts,dc=cluster,dc=com
+
+# LDAP Replicators, System Groups, cluster.com
+dn: cn=LDAP Replicators,ou=System Groups,dc=cluster,dc=com
+cn: LDAP Replicators
+objectClass: groupOfNames
+description: Members can be used for syncrepl replication
+owner: uid=LDAP Replicator,ou=System Accounts,dc=cluster,dc=com
+member: uid=LDAP Replicator,ou=System Accounts,dc=cluster,dc=com
+
+# clic, Group, cluster.com
+dn: cn=clic,ou=Group,dc=cluster,dc=com
+objectClass: groupOfNames
+objectClass: top
+cn: clic
+owner: uid=Account Admin,ou=System Accounts,dc=cluster,dc=com
+member: uid=Account Admin,ou=System Accounts,dc=cluster,dc=com
+member: uid=aginies,ou=People,dc=cluster,dc=com
+
+# su, sudoers, cluster.com
+dn: cn=su,ou=sudoers,dc=cluster,dc=com
+objectClass: top
+objectClass: sudoRole
+cn: su
+sudoOption: !authenticate
+sudoCommand: ALL
+sudoRunAs: ALL
+sudoHost: +allcluster
+sudoUser: aginies
+
+# rpmer, sudoers, cluster.com
+dn: cn=rpmer,ou=sudoers,dc=cluster,dc=com
+objectClass: top
+objectClass: sudoRole
+cn: rpmer
+sudoCommand: /bin/rpm
+sudoOption: !authenticate
+sudoHost: +clusternodes
+
+# urpmer, sudoers, cluster.com
+dn: cn=urpmer,ou=sudoers,dc=cluster,dc=com
+objectClass: top
+objectClass: sudoRole
+cn: urpmer
+sudoUser: aginies
+sudoCommand: /usr/sbin/urpmi
+sudoCommand: /usr/sbin/urpme
+sudoCommand: /usr/sbin/urpmi.update
+sudoCommand: /bin/rpm
+sudoOption: !authenticate
+sudoHost: +allcluster
+
+# aginies, People, cluster.com
+dn: uid=aginies,ou=People,dc=cluster,dc=com
+uid: aginies
+givenName: Antoine
+sn: Ginies
+objectClass: mailRecipient
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: top
+objectClass: shadowAccount
+loginShell: /bin/bash
+uidNumber: 729
+homeDirectory: /home/ginies
+gecos: Antoine Ginies
+gidNumber: 100
+mail: aginies@cluster.com
+cn: Antoine Ginies
+
+# Mounts, cluster.com
+dn: ou=Mounts,dc=cluster,dc=com
+objectClass: organizationalUnit
+ou: Mounts
+
+# auto.home, Mounts, cluster.com
+dn: ou=auto.home,ou=Mounts,dc=cluster,dc=com
+objectClass: top
+objectClass: automountMap
+ou: auto.home
+
+# aginies, auto.home, Mounts, cluster.com
+dn: cn=aginies,ou=auto.home,ou=Mounts,dc=cluster,dc=com
+objectClass: automount
+cn: aginies
+automountInformation: guibpiv.cluster.com:/home/nis/&

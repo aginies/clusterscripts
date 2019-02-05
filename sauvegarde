@@ -1,0 +1,56 @@
+#!/bin/bash
+# version 2.0 
+#set -vx
+
+LOG_FILE="/var/log/sauvegarde.log"
+REP_SAVE="/home/backup"
+DATE=`date +%d-%m-20%y`
+
+if test $# -eq 2 ; then 
+
+	if [ -d ${2} ] ; then
+		cd /tmp
+		echo "-----" >> ${LOG_FILE} 
+		echo "START Saving directory ${2}" >> ${LOG_FILE} 
+		echo " - Saving ${2}" 
+		echo
+		mkdir -p ${REP_SAVE}/
+		tar cvfz ${REP_SAVE}/${1}-${HOSTNAME}-${DATE}.tar.gz ${2}
+		RETVAL=$?
+			if [ $RETVAL -eq 0 ]; then 
+				echo 
+				echo " - Backup SUCCESS in ${REP_SAVE}/ directory"
+				date >> ${LOG_FILE} 
+				echo "END of Backup ${2}" >> ${LOG_FILE} 
+				echo "-----" >> ${LOG_FILE}
+			else
+				echo  
+                                echo " - Error in Backup !"
+				echo "ERROR in Saving ${2}" >> ${LOG_FILE}
+				echo "-----" >> ${LOG_FILE}
+			fi
+		echo " - Setting read-only and mode undelete on file"
+		chmod 0444 ${REP_SAVE}/${1}-${HOSTNAME}-${DATE}.tar.gz
+		chattr +u ${REP_SAVE}/${1}-${HOSTNAME}-${DATE}.tar.gz
+	# example of ftp backup 
+#lftp -u save,a guibo.mandrakesoft.com <<EFTP
+#mput /home/backup/${1}-${NAMEORDI}-${DATE}.tar.gz
+# EFTP
+
+	else
+		echo " Second argument must be a directory !"
+		exit 1
+	fi
+else
+	echo "|---------------------------------------------------------|"
+	echo "| usage: sauvegarde name_backup rep_to_backup             |"
+	echo "| Sauvegarde automatically add the Hostname and DATE.     |"
+	echo "|                                                         |"
+	echo "| example:                                                |"
+	echo "| sauvegarde conf /root/conf/                             |"
+	echo "| produce this output filename: conf-HOSTNAME-DATE.tar.gz |"
+	echo "|                                                         |"
+	echo "| File is store in ${REP_SAVE}/"
+	echo "| log of Backup are store in ${LOG_FILE}"
+	echo "|---------------------------------------------------------|"
+fi

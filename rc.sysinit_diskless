@@ -1,0 +1,91 @@
+#!/bin/sh
+
+action() { echo $1; shift; $*; }
+
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin
+
+echo -e "\t\t\tWelcome to \\033[1;36mReplication\\033[0;39m Linux"
+
+action "Remounting root filesystem in read-write mode" mount -n -o remount,rw /
+
+ln -s /tmp/stage2/etc/* /etc 2>/dev/null
+
+rm -f /dev ; cp -a /tmp/stage2/dev /dev
+
+mkdir /mnt /var/log
+mkdir /proc
+action "Mounting proc filesystem" mount -n -t proc /proc /proc
+
+if grep -q sysfs /proc/filesystems; then
+    mkdir /sys
+    action "Mounting sysfs on /sys" mount -t sysfs none /sys
+fi
+
+>/etc/mtab
+mount -f /
+mount -f /proc
+
+#- free up stage1 memory
+umount /stage1/proc/bus/usb /stage1/proc /stage1
+
+# Loads common modules ( no kerneld :( )
+echo "Loading additional modules..."
+load() { modprobe $* 2>/dev/null; }
+load ide-mod
+load ide-probe
+load ide-disk
+load ide-cd
+load floppy
+load af_packet
+load isofs
+load vfat
+load ext3
+load reiserfs
+load xfs
+load jfs
+load loop
+load sd_mod
+load sr_mod
+
+/sbin/ifconfig lo 127.0.0.1 netmask 255.0.0.0
+
+# disable the weird echoprt in cooked mode for user interaction:
+#stty sane
+
+#LANGUAGE (filled by make_rescue_img)
+
+grep -q noauto /proc/cmdline || drvinst SERIAL_USB
+
+# install all modules needed 
+drvinst
+ln -sf /tmp/stage2/ka /ka
+
+#mount bind proc
+mount -o bind /proc /tmp/stage2/proc
+
+# be sure to use dhcpd
+dhcpcd
+
+# copy network files
+cp -avf /etc/dhcpc/* /tmp/stage2/etc/
+cp -avf /etc/resolv.conf /tmp/stage2/etc/
+rm -rf /etc /dev /var
+
+# create symlink
+ln -sf /tmp/stage2/etc .
+ln -sf /tmp/stage2/dev .
+ln -sf /tmp/stage2/var .
+ln -sf /tmp/stage2/root .
+ln -sf /tmp/stage2/home .
+
+# mount all
+mount -a
+
+# Clean up utmp/wtmp
+> /var/run/utmp
+touch /var/log/wtmp
+chgrp utmp /var/run/utmp /var/log/wtmp
+chmod 0664 /var/run/utmp /var/log/wtmp
+
+# start go script to be ready for clustering
+chroot /tmp/stage2/ /ka/go

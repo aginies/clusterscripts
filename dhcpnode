@@ -1,0 +1,8 @@
+#!/usr/bin/perl 
+# Author : Daniel Viard <dviard@mandrakesoft.com>
+# Version 0.1
+# please report bug to: ciooker@mandrakesoft.com
+
+use dhcpnode_cluster;
+
+dhcpnode_cluster::main();
